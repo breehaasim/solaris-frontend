@@ -3,11 +3,14 @@ import { motion, AnimatePresence, useInView } from "framer-motion";
 import axios from "axios";
 
 // ─── API ───────────────────────────────────────────────────────────────────────
+const BASE_URL = import.meta.env.VITE_API_URL || "https://solaris-backend-production-b44b.up.railway.app/api";
+
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
-  timeout: 10000,
+  timeout: 15000,
 });
+
 const apiGet  = (path)        => api.get(path).then(r => r.data);
 const apiPost = (path, body)  => api.post(path, body).then(r => r.data);
 
@@ -24,7 +27,7 @@ const GLOBAL_CSS = `
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
   html{scroll-behavior:smooth;}
   body{background:#050400;color:#fff;font-family:'Rajdhani',system-ui,sans-serif;overflow-x:hidden;}
-  input,textarea{font-family:inherit;color:#fff;}
+  input,textarea,select{font-family:inherit;color:#fff;}
   input::placeholder,textarea::placeholder{color:rgba(255,255,255,0.25);}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
   @keyframes neonPulse{
@@ -101,6 +104,12 @@ const FALLBACK_FAQS = [
   {question:"What warranties do you offer?",answer:"We provide a 25-year panel power warranty, 10-year inverter warranty, and our own 5-year workmanship guarantee. Battery storage systems carry a 10-year capacity warranty."},
   {question:"Can you handle utility interconnection?",answer:"Yes. Our team manages the entire grid interconnection process including net metering applications, utility coordination, and final commissioning inspection sign-offs."},
   {question:"Do you offer financing options?",answer:"We partner with green energy lenders to offer solar loans, leases, and power purchase agreements (PPAs) with $0 down options for qualified customers."},
+];
+
+const FALLBACK_PRICING = [
+  {title:"Seed",price:"$0",features:["1 Project","Community Support","Basic Analytics"],hot:false},
+  {title:"Growth",price:"$49",features:["Unlimited Projects","Priority Support","Advanced Analytics","API Access"],hot:true},
+  {title:"Orbit",price:"$199",features:["Custom Domain","24/7 Phone Support","Dedicated Manager","White-Label"],hot:false},
 ];
 
 const STATS = [
@@ -413,9 +422,9 @@ function HomePage({setPage}) {
   );
 }
 
-// ─── SERVICES PAGE — now fetches from backend ─────────────────────────────────
-function ServicesPage() {
-  const [services,setServices]=useState(FALLBACK_SERVICES);
+// ─── SERVICES PAGE — dynamic from backend ────────────────────────────────────
+function ServicesPage({setPage}) {
+  const [services,setServices]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState(null);
 
@@ -423,14 +432,10 @@ function ServicesPage() {
     setLoading(true);
     apiGet("/services")
       .then(res=>{
-        const data=Array.isArray(res.data)?res.data:[];
-        if(data.length>0) setServices(data);
-        else setServices(FALLBACK_SERVICES);
+        const data=Array.isArray(res.data)&&res.data.length>0?res.data:FALLBACK_SERVICES;
+        setServices(data);
       })
-      .catch(()=>{
-        setError("Could not connect to server — showing default services.");
-        setServices(FALLBACK_SERVICES);
-      })
+      .catch(()=>{ setError("Showing default services."); setServices(FALLBACK_SERVICES); })
       .finally(()=>setLoading(false));
   },[]);
 
@@ -443,13 +448,16 @@ function ServicesPage() {
           {loading?<Spinner/>:(
             <motion.div variants={stagger} initial="initial" whileInView="whileInView" viewport={{once:true}} style={{display:"flex",flexDirection:"column",gap:0}}>
               {services.map((s,i)=>(
-                <motion.div key={s._id||i} variants={child} style={{display:"flex",gap:44,alignItems:"flex-start",padding:"48px 0",borderBottom:`1px solid rgba(255,255,255,0.06)`,cursor:"default"}} whileHover={{x:14}}>
+                <motion.div key={s._id||i} variants={child} style={{display:"flex",gap:44,alignItems:"flex-start",padding:"48px 0",borderBottom:`1px solid rgba(255,255,255,0.06)`,cursor:"pointer"}} whileHover={{x:14}} onClick={()=>setPage("contact")}>
                   <span style={{fontSize:"clamp(2.8rem,5vw,4.5rem)",fontWeight:900,color:Y[800],fontFamily:"'Playfair Display',Georgia,serif",lineHeight:1,minWidth:72,flexShrink:0}}>{s.number}</span>
                   <div style={{flex:1}}>
                     <h3 style={{fontSize:"clamp(1.2rem,2.5vw,1.7rem)",fontWeight:900,color:"#fff",letterSpacing:"-0.02em",marginBottom:12,fontFamily:"'Playfair Display',Georgia,serif",fontStyle:"italic"}}>{s.title}</h3>
                     <p style={{fontSize:14,color:"rgba(255,255,255,0.45)",lineHeight:1.8,maxWidth:560,fontWeight:500}}>{s.description}</p>
                     <div style={{display:"flex",gap:8,marginTop:18,flexWrap:"wrap"}}>
                       {(s.tags||[]).map(t=><span key={t} style={{fontSize:9,fontWeight:900,letterSpacing:"0.3em",textTransform:"uppercase",color:Y[400],background:Y[900],border:`1px solid ${Y[800]}`,padding:"5px 12px",borderRadius:999}}>{t}</span>)}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:20}}>
+                      <span style={{fontSize:10,fontWeight:900,letterSpacing:"0.3em",color:Y[500],textTransform:"uppercase"}}>Inquire →</span>
                     </div>
                   </div>
                 </motion.div>
@@ -475,6 +483,53 @@ function ServicesPage() {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ─── PRICING PAGE — dynamic from backend ─────────────────────────────────────
+function PricingPage({setPage}) {
+  const [plans,setPlans]=useState([]);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    apiGet("/pricing")
+      .then(res=>{
+        const data=Array.isArray(res.data)&&res.data.length>0?res.data:FALLBACK_PRICING;
+        setPlans(data);
+      })
+      .catch(()=>setPlans(FALLBACK_PRICING))
+      .finally(()=>setLoading(false));
+  },[]);
+
+  return (
+    <div style={{paddingTop:120}}>
+      <section style={{padding:"80px 24px 120px",background:"#050400"}}>
+        <div style={{maxWidth:1100,margin:"0 auto"}}>
+          <SectionHeader label="Pricing" title="Choose Your Plan" subtitle="Transparent, scalable pricing"/>
+          {loading?<Spinner/>:(
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:24}}>
+              {plans.map((p,i)=>(
+                <motion.div key={p._id||i} {...fadeUp} transition={{delay:i*0.1}} style={{borderRadius:24,padding:"40px 32px",background:p.hot?`linear-gradient(135deg,${Y[900]},#1a1000)`:"rgba(255,255,255,0.03)",border:`1px solid ${p.hot?Y[600]:"rgba(255,255,255,0.08)"}`,position:"relative",boxShadow:p.hot?`0 0 40px ${Y[700]}30`:"none",transition:"transform 0.3s,box-shadow 0.3s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-8px)";e.currentTarget.style.boxShadow=`0 24px 60px rgba(0,0,0,0.5)`;}} onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow=p.hot?`0 0 40px ${Y[700]}30`:"none";}}>
+                  {p.hot&&<span style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:`linear-gradient(135deg,${Y[400]},${Y[600]})`,color:"#000",fontSize:9,fontWeight:900,letterSpacing:"0.3em",padding:"4px 16px",borderRadius:999}}>MOST POPULAR</span>}
+                  <h3 style={{fontSize:22,fontWeight:900,color:"#fff",fontFamily:"'Playfair Display',Georgia,serif",fontStyle:"italic",marginBottom:8}}>{p.title}</h3>
+                  <div style={{fontSize:"clamp(2rem,4vw,3rem)",fontWeight:900,color:Y[400],fontFamily:"'Playfair Display',Georgia,serif",marginBottom:24,textShadow:`0 0 20px ${Y[500]}50`}}>{p.price}</div>
+                  <ul style={{listStyle:"none",padding:0,margin:"0 0 32px",display:"flex",flexDirection:"column",gap:12}}>
+                    {(p.features||[]).map((f,fi)=>(
+                      <li key={fi} style={{display:"flex",alignItems:"center",gap:10,fontSize:13,color:"rgba(255,255,255,0.65)",fontWeight:600}}>
+                        <span style={{color:Y[400],fontSize:14}}>✓</span>{f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button className="neon-btn" onClick={()=>setPage("contact")} style={{width:"100%",background:p.hot?`linear-gradient(135deg,${Y[400]},${Y[600]})`:"rgba(255,255,255,0.08)",border:p.hot?"none":`1px solid rgba(255,255,255,0.15)`,cursor:"pointer",padding:"12px",borderRadius:12,fontSize:11,fontWeight:900,letterSpacing:"0.25em",textTransform:"uppercase",color:p.hot?"#000":"rgba(255,255,255,0.7)"}}>
+                    Get Started →
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -543,7 +598,15 @@ function TeamCard({member,index}) {
             {(member.skills||[]).map(s=><span key={s} style={{fontSize:9,fontWeight:900,letterSpacing:"0.22em",color:hovered?Y[300]:Y[500],background:Y[900],border:`1px solid ${hovered?Y[700]:Y[800]}`,padding:"4px 10px",borderRadius:999,textTransform:"uppercase",transition:"all 0.3s"}}>{s}</span>)}
           </div>
           <motion.div animate={{opacity:hovered?1:0,y:hovered?0:8}} transition={{duration:0.3,delay:0.1}} style={{display:"flex",gap:9}}>
-            {["𝕏","in","⌨"].map((icon,i)=>(
+            {(member.social?.twitter||member.social?.linkedin||member.social?.github)?[
+              member.social?.twitter&&{icon:"𝕏",link:member.social.twitter},
+              member.social?.linkedin&&{icon:"in",link:member.social.linkedin},
+              member.social?.github&&{icon:"⌨",link:member.social.github},
+            ].filter(Boolean).map((s,i)=>(
+              <a key={i} href={s.link} target="_blank" rel="noopener noreferrer" style={{width:34,height:34,borderRadius:"50%",background:Y[900],border:`1px solid ${Y[700]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:Y[400],cursor:"pointer",textDecoration:"none",transition:"all 0.25s"}} onMouseEnter={e=>{e.currentTarget.style.background=Y[700];}} onMouseLeave={e=>{e.currentTarget.style.background=Y[900];}}>{s.icon}</a>
+            )):[
+              "𝕏","in","⌨"
+            ].map((icon,i)=>(
               <div key={i} style={{width:34,height:34,borderRadius:"50%",background:Y[900],border:`1px solid ${Y[700]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:Y[400],cursor:"pointer",transition:"all 0.25s"}} onMouseEnter={e=>{e.currentTarget.style.background=Y[700];}} onMouseLeave={e=>{e.currentTarget.style.background=Y[900];}}>{icon}</div>
             ))}
           </motion.div>
@@ -554,24 +617,19 @@ function TeamCard({member,index}) {
   );
 }
 
-// ─── TEAM PAGE — now fetches from backend ─────────────────────────────────────
+// ─── TEAM PAGE — dynamic from backend ────────────────────────────────────────
 function TeamPage() {
-  const [teamMembers,setTeamMembers]=useState(FALLBACK_TEAM);
+  const [teamMembers,setTeamMembers]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState(null);
 
   useEffect(()=>{
-    setLoading(true);
     apiGet("/team")
       .then(res=>{
-        const data=Array.isArray(res.data)?res.data:[];
-        if(data.length>0) setTeamMembers(data);
-        else setTeamMembers(FALLBACK_TEAM);
+        const data=Array.isArray(res.data)&&res.data.length>0?res.data:FALLBACK_TEAM;
+        setTeamMembers(data);
       })
-      .catch(()=>{
-        setError("Could not connect to server — showing default team.");
-        setTeamMembers(FALLBACK_TEAM);
-      })
+      .catch(()=>{ setError("Showing default team."); setTeamMembers(FALLBACK_TEAM); })
       .finally(()=>setLoading(false));
   },[]);
 
@@ -611,30 +669,11 @@ function TeamPage() {
           </div>
         </div>
       </section>
-      <section style={{padding:"80px 24px 100px",background:"#050400"}}>
-        <div style={{maxWidth:1100,margin:"0 auto"}}>
-          <SectionHeader label="Why Choose Us" title="The Solaris Difference" subtitle="What sets our protocol apart"/>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20}}>
-            {[
-              {icon:"☀",title:"Solar-First Engineering",desc:"Every decision optimised for maximum energy yield, not just minimum installation cost."},
-              {icon:"🔐",title:"25-Year Guarantee",desc:"Industry-leading workmanship and performance warranties backed by real engineering accountability."},
-              {icon:"📡",title:"Real-Time Monitoring",desc:"Cloud-connected SCADA dashboards so you always know exactly how your system is performing."},
-              {icon:"🤝",title:"Partnership Model",desc:"We don't hand off and disappear. O&M support is built into every project from day one."},
-            ].map((w,i)=>(
-              <motion.div key={i} {...fadeUp} transition={{delay:i*0.09}} style={{padding:"32px 26px",borderRadius:20,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",transition:"border-color 0.3s,box-shadow 0.3s,transform 0.3s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=Y[700];e.currentTarget.style.transform="translateY(-7px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.07)";e.currentTarget.style.transform="none";}}>
-                <div style={{fontSize:28,marginBottom:16}}>{w.icon}</div>
-                <h4 style={{fontSize:13,fontWeight:900,color:"#fff",textTransform:"uppercase",letterSpacing:"0.15em",marginBottom:10,fontStyle:"italic"}}>{w.title}</h4>
-                <p style={{fontSize:13,color:"rgba(255,255,255,0.4)",lineHeight:1.75}}>{w.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
 
-// ─── FAQ PAGE — now fetches from backend ──────────────────────────────────────
+// ─── FAQ PAGE — dynamic from backend ─────────────────────────────────────────
 function FAQItem({question,answer}) {
   const [open,setOpen]=useState(false);
   return (
@@ -655,22 +694,17 @@ function FAQItem({question,answer}) {
 }
 
 function FAQPage() {
-  const [faqs,setFaqs]=useState(FALLBACK_FAQS);
+  const [faqs,setFaqs]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState(null);
 
   useEffect(()=>{
-    setLoading(true);
     apiGet("/faq")
       .then(res=>{
-        const data=Array.isArray(res.data)?res.data:[];
-        if(data.length>0) setFaqs(data);
-        else setFaqs(FALLBACK_FAQS);
+        const data=Array.isArray(res.data)&&res.data.length>0?res.data:FALLBACK_FAQS;
+        setFaqs(data);
       })
-      .catch(()=>{
-        setError("Could not connect to server — showing default FAQs.");
-        setFaqs(FALLBACK_FAQS);
-      })
+      .catch(()=>{ setError("Showing default FAQs."); setFaqs(FALLBACK_FAQS); })
       .finally(()=>setLoading(false));
   },[]);
 
@@ -687,7 +721,7 @@ function FAQPage() {
   );
 }
 
-// ─── CONTACT PAGE — now posts to backend ─────────────────────────────────────
+// ─── CONTACT PAGE — fully connected to backend ────────────────────────────────
 function ContactPage() {
   const [form,setForm]=useState({name:"",email:"",subject:"",message:""});
   const [sent,setSent]=useState(false);
@@ -696,10 +730,10 @@ function ContactPage() {
 
   const validate=()=>{
     const e={};
-    if(!form.name.trim()) e.name="Required";
+    if(!form.name.trim()) e.name="Name is required";
     if(!form.email.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email="Valid email required";
-    if(!form.subject.trim()) e.subject="Required";
-    if(form.message.trim().length<20) e.message="Min 20 characters";
+    if(!form.subject.trim()) e.subject="Subject is required";
+    if(form.message.trim().length<10) e.message="Message must be at least 10 characters";
     return e;
   };
 
@@ -710,8 +744,9 @@ function ContactPage() {
     try{
       await apiPost("/contact",form);
       setSent(true);
+      setForm({name:"",email:"",subject:"",message:""});
     }catch(err){
-      setErrors({api:"Failed to send. Please check the server is running and try again."});
+      setErrors({api:err?.response?.data?.message||"Failed to send. Please try again."});
     }finally{setLoading(false);}
   };
 
@@ -727,9 +762,9 @@ function ContactPage() {
               {sent?(
                 <motion.div initial={{opacity:0,scale:0.9}} animate={{opacity:1,scale:1}} style={{textAlign:"center",padding:"60px 0"}}>
                   <div style={{fontSize:48,marginBottom:20}}>✓</div>
-                  <h3 className="neon-heading" style={{color:Y[300],fontSize:22,fontWeight:900,fontFamily:"'Playfair Display',Georgia,serif",fontStyle:"italic",marginBottom:12}}>Transmission Sent</h3>
+                  <h3 className="neon-heading" style={{color:Y[300],fontSize:22,fontWeight:900,fontFamily:"'Playfair Display',Georgia,serif",fontStyle:"italic",marginBottom:12}}>Message Sent!</h3>
                   <p style={{color:"rgba(255,255,255,0.42)",fontSize:13,lineHeight:1.75}}>Your message has been saved. We'll respond within 24 hours.</p>
-                  <button onClick={()=>{setSent(false);setForm({name:"",email:"",subject:"",message:""},);}} style={{marginTop:24,background:"none",border:`1px solid ${Y[700]}`,color:Y[400],padding:"8px 20px",borderRadius:999,cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:"0.2em",textTransform:"uppercase"}}>Send Another</button>
+                  <button onClick={()=>setSent(false)} style={{marginTop:24,background:"none",border:`1px solid ${Y[700]}`,color:Y[400],padding:"8px 20px",borderRadius:999,cursor:"pointer",fontSize:11,fontWeight:700,letterSpacing:"0.2em",textTransform:"uppercase"}}>Send Another</button>
                 </motion.div>
               ):(
                 <div style={{display:"flex",flexDirection:"column",gap:18}}>
@@ -754,13 +789,13 @@ function ContactPage() {
                     {errors.message&&<p style={{fontSize:10,color:"#f87171",marginTop:4,fontWeight:700}}>{errors.message}</p>}
                   </div>
                   <button className="neon-btn" onClick={handleSubmit} disabled={loading} style={{background:loading?Y[800]:`linear-gradient(135deg,${Y[400]},${Y[600]})`,border:"none",cursor:loading?"not-allowed":"pointer",padding:"15px",borderRadius:12,fontSize:11,fontWeight:900,letterSpacing:"0.3em",textTransform:"uppercase",color:"#000",marginTop:6,opacity:loading?0.7:1,transition:"all 0.3s"}}>
-                    {loading?"Sending…":"Send Transmission →"}
+                    {loading?"Sending…":"Send Message →"}
                   </button>
                 </div>
               )}
             </motion.div>
             <motion.div {...fadeUp} transition={{delay:0.15}} style={{display:"flex",flexDirection:"column",gap:32,justifyContent:"center"}}>
-              {[{icon:"✉",label:"Email",value:"breehaasim@gmail.com"},{icon:"☎",label:"Phone",value:"+1 (888) SOLARIS"},{icon:"◎",label:"Office",value:"Sahiwal Jail Road, Punjab"}].map((c,i)=>(
+              {[{icon:"✉",label:"Email",value:"breehaasim@gmail.com"},{icon:"☎",label:"Phone",value:"+92 300 0000000"},{icon:"◎",label:"Office",value:"Sahiwal Jail Road, Punjab"}].map((c,i)=>(
                 <motion.div key={i} whileHover={{x:10}} style={{display:"flex",gap:18,alignItems:"center",cursor:"pointer"}}>
                   <div style={{width:54,height:54,borderRadius:16,background:Y[900],border:`1px solid ${Y[800]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:Y[400],flexShrink:0,transition:"background 0.3s,box-shadow 0.3s"}} onMouseEnter={e=>{e.currentTarget.style.background=Y[700];e.currentTarget.style.boxShadow=`0 0 20px ${Y[500]}50`;}} onMouseLeave={e=>{e.currentTarget.style.background=Y[900];e.currentTarget.style.boxShadow="none";}}>{c.icon}</div>
                   <div>
@@ -782,7 +817,7 @@ function ContactPage() {
   );
 }
 
-// ─── ADMIN — MODAL COMPONENTS ─────────────────────────────────────────────────
+// ─── ADMIN MODALS ─────────────────────────────────────────────────────────────
 function ServiceModal({data,onSave,onClose,inp,btn}) {
   const [form,setForm]=useState({number:data?.number||"",title:data?.title||"",description:data?.description||"",tags:(data?.tags||[]).join(", "),order:data?.order||0});
   const save=()=>onSave("/services",data?._id,{...form,tags:form.tags.split(",").map(t=>t.trim()).filter(Boolean)},"services");
@@ -845,7 +880,7 @@ function PricingModal({data,onSave,onClose,inp,btn}) {
   return (
     <div>
       <h3 style={{color:"#fff",fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:22,fontWeight:900,marginBottom:24}}>{data?"Edit":"Add"} Pricing Plan</h3>
-      <input placeholder="Plan Title (e.g. Growth)" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp}/>
+      <input placeholder="Plan Title" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp}/>
       <input placeholder="Price (e.g. $49)" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={inp}/>
       <textarea placeholder="Features (comma separated)" rows={3} value={form.features} onChange={e=>setForm(f=>({...f,features:e.target.value}))} style={{...inp,resize:"vertical"}}/>
       <label style={{display:"flex",alignItems:"center",gap:10,color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:700,marginBottom:10,cursor:"pointer"}}>
@@ -863,7 +898,7 @@ function PricingModal({data,onSave,onClose,inp,btn}) {
 
 // ─── ADMIN PAGE ───────────────────────────────────────────────────────────────
 function AdminPage() {
-  const [token,setToken]=useState(()=>{ try{ return localStorage.getItem("solaris_admin_token")||""; }catch{ return ""; } });
+  const [token,setToken]=useState("");
   const [loginForm,setLoginForm]=useState({username:"",password:""});
   const [loginErr,setLoginErr]=useState("");
   const [logging,setLogging]=useState(false);
@@ -876,29 +911,22 @@ function AdminPage() {
   const [loading,setLoading]=useState(false);
   const [modal,setModal]=useState(null);
 
-  const authHeaders={headers:{Authorization:`Bearer ${token}`}};
+  const authHeaders=useCallback(()=>({headers:{Authorization:`Bearer ${token}`}}),[token]);
 
   const handleLogin=async()=>{
     setLogging(true);setLoginErr("");
     try{
       const res=await api.post("/auth/login",loginForm);
-      const tok=res.data.token;
-      setToken(tok);
-      try{ localStorage.setItem("solaris_admin_token",tok); }catch{}
-    }catch(e){setLoginErr(e.response?.data?.message||"Login failed");}
+      setToken(res.data.token);
+    }catch(e){setLoginErr(e.response?.data?.message||"Login failed. Check credentials.");}
     finally{setLogging(false);}
-  };
-
-  const handleLogout=()=>{
-    setToken("");
-    try{ localStorage.removeItem("solaris_admin_token"); }catch{}
   };
 
   const fetchTab=async(t)=>{
     setLoading(true);
     try{
       const map={services:"/services",team:"/team",faqs:"/faq",pricings:"/pricing",contacts:"/contact"};
-      const res=await api.get(map[t],t==="contacts"?authHeaders:{});
+      const res=t==="contacts"?await api.get(map[t],authHeaders()):await api.get(map[t]);
       if(t==="services") setServices(res.data.data||[]);
       if(t==="team")     setTeam(res.data.data||[]);
       if(t==="faqs")     setFaqs(res.data.data||[]);
@@ -912,21 +940,21 @@ function AdminPage() {
 
   const handleDelete=async(route,id,refresh)=>{
     if(!window.confirm("Delete this item?")) return;
-    try{await api.delete(`${route}/${id}`,authHeaders);fetchTab(refresh);}
+    try{await api.delete(`${route}/${id}`,authHeaders());fetchTab(refresh);}
     catch(e){alert(e.response?.data?.message||"Delete failed");}
   };
 
   const handleSave=async(route,id,body,refresh)=>{
     try{
-      if(id){await api.put(`${route}/${id}`,body,authHeaders);}
-      else{await api.post(route,body,authHeaders);}
+      if(id){await api.put(`${route}/${id}`,body,authHeaders());}
+      else{await api.post(route,body,authHeaders());}
       setModal(null);fetchTab(refresh);
     }catch(e){alert(e.response?.data?.message||"Save failed");}
   };
 
   const card={background:"rgba(255,255,255,0.04)",border:`1px solid rgba(255,255,255,0.1)`,borderRadius:16,padding:"20px 24px",marginBottom:12};
   const inp={width:"100%",background:"rgba(255,255,255,0.07)",border:`1px solid rgba(255,255,255,0.15)`,borderRadius:10,padding:"10px 14px",fontSize:13,color:"#fff",outline:"none",marginBottom:10,fontFamily:"inherit"};
-  const btn=(color="#F59E0B")=>({background:color,border:"none",borderRadius:8,padding:"8px 18px",fontSize:11,fontWeight:900,letterSpacing:"0.2em",textTransform:"uppercase",cursor:"pointer",color:color==="#F59E0B"?"#000":"#fff"});
+  const btn=(color=Y[500])=>({background:color,border:"none",borderRadius:8,padding:"8px 18px",fontSize:11,fontWeight:900,letterSpacing:"0.2em",textTransform:"uppercase",cursor:"pointer",color:color===Y[500]?"#000":"#fff"});
 
   if(!token) return (
     <div style={{paddingTop:120,minHeight:"100vh",background:"#050400",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -949,7 +977,7 @@ function AdminPage() {
       <div style={{background:`linear-gradient(135deg,${Y[900]},#0d0900)`,padding:"32px 24px",borderBottom:`1px solid ${Y[800]}40`}}>
         <div style={{maxWidth:1200,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div><SectionLabel>Admin Panel</SectionLabel><h1 style={{color:"#fff",fontFamily:"'Playfair Display',serif",fontStyle:"italic",fontSize:"clamp(1.6rem,3vw,2.4rem)",fontWeight:900,marginTop:12}}>Dashboard</h1></div>
-          <button onClick={handleLogout} style={{...btn("rgba(255,255,255,0.1)"),border:`1px solid rgba(255,255,255,0.2)`,color:"rgba(255,255,255,0.7)"}}>Log Out</button>
+          <button onClick={()=>setToken("")} style={{...btn("rgba(255,255,255,0.1)"),border:`1px solid rgba(255,255,255,0.2)`,color:"rgba(255,255,255,0.7)"}}>Log Out</button>
         </div>
       </div>
       <div style={{maxWidth:1200,margin:"0 auto",padding:"40px 24px"}}>
@@ -974,6 +1002,7 @@ function AdminPage() {
                   <h3 style={{color:"#fff",fontWeight:900,fontSize:18}}>Services ({services.length})</h3>
                   <button onClick={()=>setModal({type:"service",data:null})} style={btn()}>+ Add Service</button>
                 </div>
+                {services.length===0&&<p style={{color:"rgba(255,255,255,0.3)",textAlign:"center",padding:"40px 0"}}>No services yet. Add one!</p>}
                 {services.map(s=>(
                   <div key={s._id} style={card}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16}}>
@@ -1000,6 +1029,7 @@ function AdminPage() {
                   <h3 style={{color:"#fff",fontWeight:900,fontSize:18}}>Team Members ({team.length})</h3>
                   <button onClick={()=>setModal({type:"team",data:null})} style={btn()}>+ Add Member</button>
                 </div>
+                {team.length===0&&<p style={{color:"rgba(255,255,255,0.3)",textAlign:"center",padding:"40px 0"}}>No team members yet. Add one!</p>}
                 {team.map(m=>(
                   <div key={m._id} style={card}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
@@ -1028,6 +1058,7 @@ function AdminPage() {
                   <h3 style={{color:"#fff",fontWeight:900,fontSize:18}}>FAQs ({faqs.length})</h3>
                   <button onClick={()=>setModal({type:"faq",data:null})} style={btn()}>+ Add FAQ</button>
                 </div>
+                {faqs.length===0&&<p style={{color:"rgba(255,255,255,0.3)",textAlign:"center",padding:"40px 0"}}>No FAQs yet. Add one!</p>}
                 {faqs.map(f=>(
                   <div key={f._id} style={card}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16}}>
@@ -1050,6 +1081,7 @@ function AdminPage() {
                   <h3 style={{color:"#fff",fontWeight:900,fontSize:18}}>Pricing Plans ({pricings.length})</h3>
                   <button onClick={()=>setModal({type:"pricing",data:null})} style={btn()}>+ Add Plan</button>
                 </div>
+                {pricings.length===0&&<p style={{color:"rgba(255,255,255,0.3)",textAlign:"center",padding:"40px 0"}}>No pricing plans yet. Add one!</p>}
                 {pricings.map(p=>(
                   <div key={p._id} style={card}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
@@ -1146,11 +1178,6 @@ function Footer({setPage}) {
                 All Systems Online
               </span>
             </div>
-            <div style={{display:"flex",gap:10,marginTop:20}}>
-              {["𝕏","in","⌨"].map((s,i)=>(
-                <div key={i} style={{width:38,height:38,borderRadius:"50%",border:`1px solid rgba(255,255,255,0.12)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,color:"rgba(255,255,255,0.35)",transition:"all 0.25s"}} onMouseEnter={e=>{e.currentTarget.style.color=Y[400];e.currentTarget.style.borderColor=Y[500];}} onMouseLeave={e=>{e.currentTarget.style.color="rgba(255,255,255,0.35)";e.currentTarget.style.borderColor="rgba(255,255,255,0.12)";}}>{s}</div>
-              ))}
-            </div>
           </div>
         </div>
         <div style={{borderTop:`1px solid rgba(255,255,255,0.06)`,paddingTop:26,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
@@ -1162,32 +1189,51 @@ function Footer({setPage}) {
   );
 }
 
+// ─── 404 PAGE ─────────────────────────────────────────────────────────────────
+function NotFoundPage({setPage}) {
+  return (
+    <div style={{paddingTop:120,minHeight:"80vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#050400",textAlign:"center",padding:"120px 24px"}}>
+      <motion.div {...fadeUp}>
+        <div style={{fontSize:80,fontWeight:900,color:Y[800],fontFamily:"'Playfair Display',Georgia,serif",lineHeight:1}}>404</div>
+        <h2 className="neon-heading" style={{fontSize:"clamp(1.5rem,3vw,2.5rem)",fontWeight:900,color:"#fff",fontFamily:"'Playfair Display',Georgia,serif",fontStyle:"italic",margin:"16px 0 12px"}}>Page Not Found</h2>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:14,marginBottom:32}}>The page you're looking for doesn't exist.</p>
+        <button className="neon-btn" onClick={()=>setPage("home")} style={{background:`linear-gradient(135deg,${Y[400]},${Y[600]})`,border:"none",cursor:"pointer",padding:"13px 32px",borderRadius:999,fontSize:11,fontWeight:900,letterSpacing:"0.28em",textTransform:"uppercase",color:"#000"}}>Go Home →</button>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [page,setPage]=useState("home");
   const [scrolled,setScrolled]=useState(false);
+
   useEffect(()=>{
     const onScroll=()=>setScrolled(window.scrollY>50);
     window.addEventListener("scroll",onScroll,{passive:true});
     return ()=>window.removeEventListener("scroll",onScroll);
   },[]);
+
   useEffect(()=>{window.scrollTo({top:0,behavior:"smooth"});},[page]);
+
   const pages={
     home:<HomePage setPage={setPage}/>,
-    services:<ServicesPage/>,
+    services:<ServicesPage setPage={setPage}/>,
     about:<AboutPage/>,
     team:<TeamPage/>,
     faq:<FAQPage/>,
+    pricing:<PricingPage setPage={setPage}/>,
     contact:<ContactPage/>,
     admin:<AdminPage/>,
   };
+
   return (
     <>
       <style>{GLOBAL_CSS}</style>
       <Navbar active={page} setActive={setPage} scrolled={scrolled}/>
       <AnimatePresence mode="wait">
         <motion.main key={page} initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-14}} transition={{duration:0.4,ease:[0.22,1,0.36,1]}}>
-          {pages[page]??<HomePage setPage={setPage}/>}
+          {pages[page]??<NotFoundPage setPage={setPage}/>}
         </motion.main>
       </AnimatePresence>
       <Footer setPage={setPage}/>
